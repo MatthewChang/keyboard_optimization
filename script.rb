@@ -1,5 +1,6 @@
 require 'CSV'
 require 'byebug'
+require 'rglpk'
 
 def parse_letter(letter)
   letter = letter.downcase
@@ -92,9 +93,62 @@ puts rating(qwerty)
 puts rating(qwerty_adjusted)
 puts rating(colemak)
 new = colemak
-300.times do
-  new = iterate(new)
-end
-puts new
-puts rating(new)
+#300.times do
+  #new = iterate(new)
+#end
+#puts new
+#puts rating(new)
 # puts swapped(qwerty,[0,0],[1,1])
+
+#4x4 example
+
+p = Rglpk::Problem.new
+p.name = "Keyboard"
+p.obj.dir = Rglpk::GLP_MAX
+
+matrix = []
+
+#rules
+#each key must appear somewhere
+#4.times do
+  #rows = p.add_rows(1)
+  #matrix << [1,1,0,0] 
+  #rows[0].name =""
+  #rows[0].set_bounds(Rglpk::GLP_UP,1,1)
+#end
+
+rows = p.add_rows(3)
+rows[0].name = "p"
+rows[0].set_bounds(Rglpk::GLP_UP, 0, 100)
+rows[1].name = "q"
+rows[1].set_bounds(Rglpk::GLP_UP, 0, 600)
+rows[2].name = "r"
+rows[2].set_bounds(Rglpk::GLP_FX, 300, 300)
+
+cols = p.add_cols(3)
+cols[0].name = "x1"
+cols[0].set_bounds(Rglpk::GLP_LO, 0.0, 0.0)
+cols[0].kind = Rglpk::GLP_IV
+cols[1].name = "x2"
+cols[1].set_bounds(Rglpk::GLP_LO, 0.0, 0.0)
+cols[2].name = "x3"
+cols[1].kind = Rglpk::GLP_IV
+cols[2].set_bounds(Rglpk::GLP_LO, 0.0, 0.0)
+cols[2].kind = Rglpk::GLP_IV
+
+p.obj.coefs = [10, 6, 4]
+
+p.set_matrix([
+ 1, 1, 1,
+10, 4, 5,
+ 2, 2, 6
+])
+
+p.simplex
+p.mip
+z = p.obj.mip
+x1 = cols[0].mip_val
+x2 = cols[1].mip_val
+x3 = cols[2].mip_val
+
+printf("z = %g; x1 = %g; x2 = %g; x3 = %g\n", z, x1, x2, x3)
