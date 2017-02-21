@@ -93,62 +93,104 @@ puts rating(qwerty)
 puts rating(qwerty_adjusted)
 puts rating(colemak)
 new = colemak
-#300.times do
-  #new = iterate(new)
-#end
-#puts new
-#puts rating(new)
+# 300.times do
+# new = iterate(new)
+# end
+# puts new
+# puts rating(new)
 # puts swapped(qwerty,[0,0],[1,1])
 
-#4x4 example
+# 4x4 example
 
 p = Rglpk::Problem.new
-p.name = "Keyboard"
+p.name = 'Keyboard'
 p.obj.dir = Rglpk::GLP_MAX
 
 matrix = []
 
-#rules
-#each key must appear somewhere
-#4.times do
-  #rows = p.add_rows(1)
-  #matrix << [1,1,0,0] 
-  #rows[0].name =""
-  #rows[0].set_bounds(Rglpk::GLP_UP,1,1)
-#end
+# rules
+# each key must appear somewhere
+# 4.times do
+# rows = p.add_rows(1)
+# matrix << [1,1,0,0]
+# rows[0].name =""
+# rows[0].set_bounds(Rglpk::GLP_UP,1,1)
+# end
 
-rows = p.add_rows(3)
-rows[0].name = "p"
-rows[0].set_bounds(Rglpk::GLP_UP, 0, 100)
-rows[1].name = "q"
-rows[1].set_bounds(Rglpk::GLP_UP, 0, 600)
-rows[2].name = "r"
-rows[2].set_bounds(Rglpk::GLP_FX, 300, 300)
+# rows = p.add_rows(3)
+# rows[0].name = "p"
+# rows[0].set_bounds(Rglpk::GLP_UP, 0, 100)
+# rows[1].name = "q"
+# rows[1].set_bounds(Rglpk::GLP_UP, 0, 600)
+# rows[2].name = "r"
+# rows[2].set_bounds(Rglpk::GLP_FX, 300, 300)
 
-cols = p.add_cols(3)
-cols[0].name = "x1"
-cols[0].set_bounds(Rglpk::GLP_LO, 0.0, 0.0)
-cols[0].kind = Rglpk::GLP_IV
-cols[1].name = "x2"
-cols[1].set_bounds(Rglpk::GLP_LO, 0.0, 0.0)
-cols[2].name = "x3"
-cols[1].kind = Rglpk::GLP_IV
-cols[2].set_bounds(Rglpk::GLP_LO, 0.0, 0.0)
-cols[2].kind = Rglpk::GLP_IV
+numKeyCols = 2
+keyPerCol = 2
+keys = %w(a b c d)
+numKeys = keys.count
+$numKeys = numKeys
+numVars = numKeyCols * numKeys
 
-p.obj.coefs = [10, 6, 4]
+def varIndex(colIndex, keyIndex)
+  colIndex * $numKeys + keyIndex
+end
 
-p.set_matrix([
- 1, 1, 1,
-10, 4, 5,
- 2, 2, 6
-])
+mipCols = p.add_cols(numVars)
+mipCols.each do |col|
+  col.set_bounds(Rglpk::GLP_DB, 0, 1)
+  col.kind = Rglpk::GLP_IV
+end
 
+# A_{kc} is 1 if key k is in column c
+# cols firs then keys
+
+p.obj.coefs = [1, 1, 1, 1, 1, 1, 1, 1]
+# rules
+# key must be in 1 column
+for i in 0..numKeys - 1 do
+  row = [0] * (i * numKeyCols) + [1] * numKeyCols + [0] * (numKeyCols * (numKeys - 1 - i))
+  lprows = p.add_rows(1)
+  lprows[0].set_bounds(Rglpk::GLP_FX,1,1)
+  matrix << row
+end
+
+# column must contain 2 keys
+for i in 0..numKeyCols - 1 do
+  row = [0] * numVars
+  for k in 0..numKeys - 1 do
+    row[varIndex(i, k)] = 1
+  end
+  lprows = p.add_rows(1)
+  lprows[0].set_bounds(Rglpk::GLP_FX,keyPerCol,keyPerCol)
+  matrix << row
+end
+
+p.set_matrix(matrix.flatten)
+
+puts matrix.to_a.map(&:inspect)
 p.simplex
-p.mip
+p.mip 
 z = p.obj.mip
-x1 = cols[0].mip_val
-x2 = cols[1].mip_val
-x3 = cols[2].mip_val
+puts z
+for colNum in 0..numKeyCols-1 do
+  col = []
+  for ki in 0..numKeys-1 do
+    col << keys[ki] if cos
+  end
+end
 
-printf("z = %g; x1 = %g; x2 = %g; x3 = %g\n", z, x1, x2, x3)
+# p.set_matrix([
+# 1, 1, 1,
+# 10, 4, 5,
+# 2, 2, 6
+# ])
+
+# p.simplex
+# p.mip
+# z = p.obj.mip
+# x1 = cols[0].mip_val
+# x2 = cols[1].mip_val
+# x3 = cols[2].mip_val
+
+# printf("z = %g; x1 = %g; x2 = %g; x3 = %g\n", z, x1, x2, x3)
