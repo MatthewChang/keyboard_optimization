@@ -53,13 +53,13 @@ module MIP
     end
   end
 
-  def self.H_generator(numKeys, numCols)
+  def self.H_generator(numKeys, numCols, offset = 0)
     keyPairCount = numKeys * (numKeys - 1) / 2
 
     keyPairIndex = keyPairIndexGenerator(numKeys)
 
     ->(k1, k2, col) do
-      (col * keyPairCount) + keyPairIndex.call(k1, k2)
+      (col * keyPairCount) + keyPairIndex.call(k1, k2) + offset
     end
   end
 end

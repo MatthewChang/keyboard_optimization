@@ -4,7 +4,8 @@ require_relative '../MIP'
 
 describe 'index functions' do
   it 'computes indicies for H_ijc' do
-    H = MIP.H_generator(20, 8)
+    offset = 9
+    H = MIP.H_generator(20, 8, offset)
     indices = []
     for k1 in 0..19 do
       for k2 in (k1 + 1)..19 do
@@ -13,7 +14,7 @@ describe 'index functions' do
         end
       end
     end
-    expect(indices).to match_array (0..(20 * 19 / 2 * 8)-1).to_a
+    expect(indices).to match_array (offset..(20 * 19 / 2 * 8)-1+offset).to_a
   end
 
   it 'computes continuous key combination indices' do

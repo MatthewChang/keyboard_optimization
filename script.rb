@@ -145,13 +145,7 @@ def keyPairIndex(keyIndex1, keyIndex2)
   (0..$numKeys).to_a.combination(2).to_a.index([keyIndex1, keyIndex2])
 end
 
-columnPairIndex = ->(k1, k2, col) do
-  (col * keyPairCount(numKeys) + keyPairIndex(k1, k2)) + numKeys * numKeyCols
-end
-
-#def columnPairIndex(keyIndex1, keyIndex2, column)
-  #(column * keyPairCount($numKeys) + keyPairIndex(keyIndex1, keyIndex2)) + $numKeys * numKeyCols
-#end
+columnPairIndex = MIP.H_generator(numKeys,numKeyCols,numKeys*numKeyCols)
 
 mipCols = p.add_cols(numVars)
 mipCols.each do |col|
