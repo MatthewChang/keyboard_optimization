@@ -131,23 +131,27 @@ keyPerCol = 2
 keys = %w(a b c d)
 numKeys = keys.count
 $numKeys = numKeys
-numKeyColumnPairs = numKeys * (numKeys-1) * numKeyCols / 2
+numKeyColumnPairs = numKeys * (numKeys - 1) * numKeyCols / 2
 numVars = (numKeyCols * numKeys) + numKeyColumnPairs
 def keyPairCount(num)
-  num*(num-1)/2
+  num * (num - 1) / 2
 end
 
 def keyColIndex(colIndex, keyIndex)
   colIndex * $numKeys + keyIndex
 end
 
-def keyPairIndex(keyIndex1,keyIndex2)
-  (0..$numKeys).to_a.combination(2).to_a.index([keyIndex1,keyIndex2])
+def keyPairIndex(keyIndex1, keyIndex2)
+  (0..$numKeys).to_a.combination(2).to_a.index([keyIndex1, keyIndex2])
 end
 
-def columnPairIndex(keyIndex1,keyIndex2,column)
-  column*keyPairCount($numKeys) + keyPairIndex(keyIndex1,keyIndex2)
+columnPairIndex = ->(k1, k2, col) do
+  (col * keyPairCount(numKeys) + keyPairIndex(k1, k2)) + numKeys * numKeyCols
 end
+
+#def columnPairIndex(keyIndex1, keyIndex2, column)
+  #(column * keyPairCount($numKeys) + keyPairIndex(keyIndex1, keyIndex2)) + $numKeys * numKeyCols
+#end
 
 mipCols = p.add_cols(numVars)
 mipCols.each do |col|
@@ -158,16 +162,16 @@ end
 # A_{kc} is 1 if key k is in column c
 # cols firs then keys
 
-p.obj.coefs = [1]*numVars
+p.obj.coefs = [1] * numVars
 # rules
 # key must be in 1 column
 for i in 0..numKeys - 1 do
-  row = [0]*numVars
+  row = [0] * numVars
   for ci in 0..numKeyCols - 1 do
-    row[keyColIndex(ci,i)] = 1
+    row[keyColIndex(ci, i)] = 1
   end
   lprows = p.add_rows(1)
-  lprows[0].set_bounds(Rglpk::GLP_FX,1,1)
+  lprows[0].set_bounds(Rglpk::GLP_FX, 1, 1)
   matrix << row
 end
 
@@ -178,23 +182,37 @@ for i in 0..numKeyCols - 1 do
     row[keyColIndex(i, k)] = 1
   end
   lprows = p.add_rows(1)
-  lprows[0].set_bounds(Rglpk::GLP_FX,keyPerCol,keyPerCol)
+  lprows[0].set_bounds(Rglpk::GLP_FX, keyPerCol, keyPerCol)
   matrix << row
 end
 
-p.set_matrix(matrix.flatten)
+# key pair-column aggregator indacators are set
+puts numVars
+for k1 in 0..numKeys - 1 do
+  for k2 in (k1 + 1)..numKeys - 1 do
+    for col in 0..numKeyCols - 1 do
+      t = columnPairIndex.call(k1, k2, col)
+      puts t
+      v1 = keyColIndex(col,k1)
+      v2 = keyColIndex(col,k2)
+      MIP.and(p, matrix, t, v1, v2)
+    end
+  end
+end
 
 puts matrix.to_a.map(&:inspect)
+p.set_matrix(matrix.flatten)
+
 p.simplex
 p.mip(presolve: Rglpk::GLP_ON)
 z = p.obj.mip
 puts z
-#for colNum in 0..numKeyCols-1 do
-  #col = []
-  #for ki in 0..numKeys-1 do
-    #col << keys[ki] if cos
-  #end
-#end
+# for colNum in 0..numKeyCols-1 do
+# col = []
+# for ki in 0..numKeys-1 do
+# col << keys[ki] if cos
+# end
+# end
 
 # p.set_matrix([
 # 1, 1, 1,

@@ -46,4 +46,20 @@ module MIP
     newRow[target] = 1
     matrix << newRow
   end
+
+  def self.keyPairIndexGenerator(numKeys)
+    ->(k1, k2) do
+      (0..(numKeys-1)).to_a.combination(2).to_a.index([k1, k2])
+    end
+  end
+
+  def self.H_generator(numKeys, numCols)
+    keyPairCount = numKeys * (numKeys - 1) / 2
+
+    keyPairIndex = keyPairIndexGenerator(numKeys)
+
+    ->(k1, k2, col) do
+      (col * keyPairCount) + keyPairIndex.call(k1, k2)
+    end
+  end
 end
