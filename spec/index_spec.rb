@@ -17,6 +17,13 @@ describe 'index functions' do
     expect(indices).to match_array (offset..(20 * 19 / 2 * 8)-1+offset).to_a
   end
 
+  it 'returns correct ranges and counts' do
+    offset = 9
+    H = MIP.H_generator(20, 8, offset)
+    expect(H.count).to eq (20*19*8/2)
+    expect(H.range).to eq [9,(20*19*8/2) + 8]
+  end
+
   it 'computes continuous key combination indices' do
     K = MIP.keyPairIndexGenerator(40)
     indices = []

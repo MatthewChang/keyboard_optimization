@@ -1,4 +1,5 @@
 require 'rglpk'
+require_relative './IndicatorSet'
 
 module MIP
   def self.and(problem, matrix, target, v1, v2)
@@ -47,19 +48,28 @@ module MIP
     matrix << newRow
   end
 
-  def self.keyPairIndexGenerator(numKeys)
-    ->(k1, k2) do
-      (0..(numKeys-1)).to_a.combination(2).to_a.index([k1, k2])
+  def self.keyPairIndexGenerator(numKeys,offset = 0)
+    count = numKeys * (numKeys - 1) / 2
+    func = ->(k1, k2) do
+      (0..(numKeys - 1)).to_a.combination(2).to_a.index([k1, k2])
     end
+    IndicatorSet.new(func,count,offset)
   end
 
   def self.H_generator(numKeys, numCols, offset = 0)
-    keyPairCount = numKeys * (numKeys - 1) / 2
-
     keyPairIndex = keyPairIndexGenerator(numKeys)
-
-    ->(k1, k2, col) do
-      (col * keyPairCount) + keyPairIndex.call(k1, k2) + offset
+    func = ->(k1, k2, col) do
+      (col * keyPairIndex.count) + keyPairIndex.call(k1, k2)
     end
+    IndicatorSet.new(func,keyPairIndex.count*numCols,offset)
+  end
+
+  def self.M_generator(numKeys, offset = 0)
+    keyPairIndexGenerator(numKeys,offset)
+  end
+
+  def self.P_generator(numKeys,numCols,offset = 0)
+    func = ->(k,c) { c*numKeys + k }
+    IndicatorSet.new(func,numKeys*numCols,offset)
   end
 end

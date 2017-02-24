@@ -133,19 +133,24 @@ numKeys = keys.count
 $numKeys = numKeys
 numKeyColumnPairs = numKeys * (numKeys - 1) * numKeyCols / 2
 numVars = (numKeyCols * numKeys) + numKeyColumnPairs
-def keyPairCount(num)
-  num * (num - 1) / 2
-end
 
-def keyColIndex(colIndex, keyIndex)
-  colIndex * $numKeys + keyIndex
-end
+# P_{ic} is an indicator variable which is true if k_i appears in column i
+# in the final solution
+# P_index computes the index of one of the H indicator variables
+P_index = MIP.P_generator(numKeys,numKeyCols)
+offset = P_index.range[1]+1
+puts offset
 
-def keyPairIndex(keyIndex1, keyIndex2)
-  (0..$numKeys).to_a.combination(2).to_a.index([keyIndex1, keyIndex2])
-end
+# H_{ijc} is an indicator variable which is true if k_i, and k_j are both
+# in column c in the final solution
+# H_index computes the index of one of the H indicator variables
+H_index = MIP.H_generator(numKeys,numKeyCols,offset)
 
-columnPairIndex = MIP.H_generator(numKeys,numKeyCols,numKeys*numKeyCols)
+offset = H_index.range[1]+1
+# M_{ik} is an indicator variable which is true if k_i, and k_j are in the
+# same column in the final solution
+# M_index computes the index of one of the M indicator variables
+M_index = MIP.M_generator(numKeys,offset)
 
 mipCols = p.add_cols(numVars)
 mipCols.each do |col|
@@ -159,10 +164,10 @@ end
 p.obj.coefs = [1] * numVars
 # rules
 # key must be in 1 column
-for i in 0..numKeys - 1 do
+for ki in 0..numKeys - 1 do
   row = [0] * numVars
   for ci in 0..numKeyCols - 1 do
-    row[keyColIndex(ci, i)] = 1
+    row[P_index.call(ki,ci)] = 1
   end
   lprows = p.add_rows(1)
   lprows[0].set_bounds(Rglpk::GLP_FX, 1, 1)
@@ -170,10 +175,10 @@ for i in 0..numKeys - 1 do
 end
 
 # column must be filled
-for i in 0..numKeyCols - 1 do
+for ci in 0..numKeyCols - 1 do
   row = [0] * numVars
-  for k in 0..numKeys - 1 do
-    row[keyColIndex(i, k)] = 1
+  for ki in 0..numKeys - 1 do
+    row[P_index.call(ki,ci)] = 1
   end
   lprows = p.add_rows(1)
   lprows[0].set_bounds(Rglpk::GLP_FX, keyPerCol, keyPerCol)
@@ -185,10 +190,10 @@ puts numVars
 for k1 in 0..numKeys - 1 do
   for k2 in (k1 + 1)..numKeys - 1 do
     for col in 0..numKeyCols - 1 do
-      t = columnPairIndex.call(k1, k2, col)
+      t = H_index.call(k1, k2, col)
       puts t
-      v1 = keyColIndex(col,k1)
-      v2 = keyColIndex(col,k2)
+      v1 = P_index.call(k1,col)
+      v2 = P_index.call(k2,col)
       MIP.and(p, matrix, t, v1, v2)
     end
   end
