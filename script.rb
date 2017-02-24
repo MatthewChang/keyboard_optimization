@@ -109,48 +109,30 @@ p.obj.dir = Rglpk::GLP_MAX
 
 matrix = []
 
-# rules
-# each key must appear somewhere
-# 4.times do
-# rows = p.add_rows(1)
-# matrix << [1,1,0,0]
-# rows[0].name =""
-# rows[0].set_bounds(Rglpk::GLP_UP,1,1)
-# end
-
-# rows = p.add_rows(3)
-# rows[0].name = "p"
-# rows[0].set_bounds(Rglpk::GLP_UP, 0, 100)
-# rows[1].name = "q"
-# rows[1].set_bounds(Rglpk::GLP_UP, 0, 600)
-# rows[2].name = "r"
-# rows[2].set_bounds(Rglpk::GLP_FX, 300, 300)
-
 numKeyCols = 2
 keyPerCol = 2
 keys = %w(a b c d)
 numKeys = keys.count
-$numKeys = numKeys
-numKeyColumnPairs = numKeys * (numKeys - 1) * numKeyCols / 2
-numVars = (numKeyCols * numKeys) + numKeyColumnPairs
 
 # P_{ic} is an indicator variable which is true if k_i appears in column i
 # in the final solution
 # P_index computes the index of one of the H indicator variables
 P_index = MIP.P_generator(numKeys,numKeyCols)
 offset = P_index.range[1]+1
-puts offset
 
 # H_{ijc} is an indicator variable which is true if k_i, and k_j are both
 # in column c in the final solution
 # H_index computes the index of one of the H indicator variables
 H_index = MIP.H_generator(numKeys,numKeyCols,offset)
-
 offset = H_index.range[1]+1
+
 # M_{ik} is an indicator variable which is true if k_i, and k_j are in the
 # same column in the final solution
 # M_index computes the index of one of the M indicator variables
 M_index = MIP.M_generator(numKeys,offset)
+offset = M_index.range[1] +1
+
+numVars = P_index.count + H_index.count + M_index.count
 
 mipCols = p.add_cols(numVars)
 mipCols.each do |col|
@@ -158,10 +140,9 @@ mipCols.each do |col|
   col.kind = Rglpk::GLP_IV
 end
 
-# A_{kc} is 1 if key k is in column c
-# cols firs then keys
-
+# result should be 8 with 4 keys in 2 cols of 2
 p.obj.coefs = [1] * numVars
+
 # rules
 # key must be in 1 column
 for ki in 0..numKeys - 1 do
@@ -186,7 +167,6 @@ for ci in 0..numKeyCols - 1 do
 end
 
 # key pair-column aggregator indacators are set
-puts numVars
 for k1 in 0..numKeys - 1 do
   for k2 in (k1 + 1)..numKeys - 1 do
     for col in 0..numKeyCols - 1 do
@@ -199,6 +179,18 @@ for k1 in 0..numKeys - 1 do
   end
 end
 
+# compute M_{ij} as an or over H_{ijc}
+for k1 in 0..numKeys - 1 do
+  for k2 in (k1 + 1)..numKeys - 1 do
+    t = M_index.call(k1, k2)
+    vs = []
+    for col in 0..numKeyCols - 1 do
+      vs << H_index.call(k1,k2,col)
+    end
+    MIP.or(p, matrix, t, *vs)
+  end
+end
+
 puts matrix.to_a.map(&:inspect)
 p.set_matrix(matrix.flatten)
 
@@ -206,24 +198,19 @@ p.simplex
 p.mip(presolve: Rglpk::GLP_ON)
 z = p.obj.mip
 puts z
-# for colNum in 0..numKeyCols-1 do
-# col = []
-# for ki in 0..numKeys-1 do
-# col << keys[ki] if cos
-# end
-# end
 
-# p.set_matrix([
-# 1, 1, 1,
-# 10, 4, 5,
-# 2, 2, 6
-# ])
-
-# p.simplex
-# p.mip
-# z = p.obj.mip
-# x1 = cols[0].mip_val
-# x2 = cols[1].mip_val
-# x3 = cols[2].mip_val
-
-# printf("z = %g; x1 = %g; x2 = %g; x3 = %g\n", z, x1, x2, x3)
+remaining_keys = keys.dup
+board = []
+for c in 0..numKeyCols-1 do
+  col = []
+  for k in 0..numKeys-1 do
+    if mipCols[P_index.call(k,c)].mip_val == 1
+      key = keys[k]
+      col << key
+      raise "key used twice" unless remaining_keys.delete key
+    end
+  end
+  board << col
+end
+raise remaining_keys unless remaining_keys.empty?
+puts board.to_a.map(&:inspect)
