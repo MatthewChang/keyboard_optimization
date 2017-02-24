@@ -1,6 +1,7 @@
 require 'CSV'
 require 'byebug'
 require 'rglpk'
+require_relative './MIP'
 
 def parse_letter(letter)
   letter = letter.downcase
@@ -130,10 +131,22 @@ keyPerCol = 2
 keys = %w(a b c d)
 numKeys = keys.count
 $numKeys = numKeys
-numVars = numKeyCols * numKeys
+numKeyColumnPairs = numKeys * (numKeys-1) * numKeyCols / 2
+numVars = (numKeyCols * numKeys) + numKeyColumnPairs
+def keyPairCount(num)
+  num*(num-1)/2
+end
 
-def varIndex(colIndex, keyIndex)
+def keyColIndex(colIndex, keyIndex)
   colIndex * $numKeys + keyIndex
+end
+
+def keyPairIndex(keyIndex1,keyIndex2)
+  (0..$numKeys).to_a.combination(2).to_a.index([keyIndex1,keyIndex2])
+end
+
+def columnPairIndex(keyIndex1,keyIndex2,column)
+  column*keyPairCount($numKeys) + keyPairIndex(keyIndex1,keyIndex2)
 end
 
 mipCols = p.add_cols(numVars)
@@ -145,21 +158,24 @@ end
 # A_{kc} is 1 if key k is in column c
 # cols firs then keys
 
-p.obj.coefs = [1, 1, 1, 1, 1, 1, 1, 1]
+p.obj.coefs = [1]*numVars
 # rules
 # key must be in 1 column
 for i in 0..numKeys - 1 do
-  row = [0] * (i * numKeyCols) + [1] * numKeyCols + [0] * (numKeyCols * (numKeys - 1 - i))
+  row = [0]*numVars
+  for ci in 0..numKeyCols - 1 do
+    row[keyColIndex(ci,i)] = 1
+  end
   lprows = p.add_rows(1)
   lprows[0].set_bounds(Rglpk::GLP_FX,1,1)
   matrix << row
 end
 
-# column must contain 2 keys
+# column must be filled
 for i in 0..numKeyCols - 1 do
   row = [0] * numVars
   for k in 0..numKeys - 1 do
-    row[varIndex(i, k)] = 1
+    row[keyColIndex(i, k)] = 1
   end
   lprows = p.add_rows(1)
   lprows[0].set_bounds(Rglpk::GLP_FX,keyPerCol,keyPerCol)
@@ -170,15 +186,15 @@ p.set_matrix(matrix.flatten)
 
 puts matrix.to_a.map(&:inspect)
 p.simplex
-p.mip 
+p.mip(presolve: Rglpk::GLP_ON)
 z = p.obj.mip
 puts z
-for colNum in 0..numKeyCols-1 do
-  col = []
-  for ki in 0..numKeys-1 do
-    col << keys[ki] if cos
-  end
-end
+#for colNum in 0..numKeyCols-1 do
+  #col = []
+  #for ki in 0..numKeys-1 do
+    #col << keys[ki] if cos
+  #end
+#end
 
 # p.set_matrix([
 # 1, 1, 1,
