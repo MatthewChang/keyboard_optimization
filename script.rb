@@ -105,7 +105,7 @@ new = colemak
 
 p = Rglpk::Problem.new
 p.name = 'Keyboard'
-p.obj.dir = Rglpk::GLP_MAX
+p.obj.dir = Rglpk::GLP_MIN
 
 matrix = []
 
@@ -141,7 +141,23 @@ mipCols.each do |col|
 end
 
 # result should be 8 with 4 keys in 2 cols of 2
-p.obj.coefs = [1] * numVars
+objCoefs = [0] * numVars
+
+testFrequency = {'a'=> {'b' => 400}, 'b'=> {}, 'c'=> {'d'=> 300, 'a'=> 100}, 'd'=> {}}
+C = ->(i,j) { 
+  testFrequency[keys[i]][keys[j]].to_i + testFrequency[keys[j]][keys[i]].to_i 
+}
+
+# Minimize conflict given by Sum_{ij} M_{ij}C_{ij} where 
+# C_{ij} gives the conflict rating of keys k_i and k_j
+for i in 0..numKeys - 1 do
+  for j in (i+1)..numKeys - 1 do
+    objCoefs[M_index.call(i,j)] = C.call(i,j)
+    puts [keys[i], keys[j], C.call(i,j), C.call(j,i)].inspect
+  end
+end
+p.obj.coefs = objCoefs
+puts objCoefs.inspect
 
 # rules
 # key must be in 1 column
@@ -171,7 +187,6 @@ for k1 in 0..numKeys - 1 do
   for k2 in (k1 + 1)..numKeys - 1 do
     for col in 0..numKeyCols - 1 do
       t = H_index.call(k1, k2, col)
-      puts t
       v1 = P_index.call(k1,col)
       v2 = P_index.call(k2,col)
       MIP.and(p, matrix, t, v1, v2)
@@ -191,7 +206,7 @@ for k1 in 0..numKeys - 1 do
   end
 end
 
-puts matrix.to_a.map(&:inspect)
+#puts matrix.to_a.map(&:inspect)
 p.set_matrix(matrix.flatten)
 
 p.simplex
