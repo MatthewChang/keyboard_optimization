@@ -143,7 +143,7 @@ end
 # result should be 8 with 4 keys in 2 cols of 2
 objCoefs = [0] * numVars
 
-testFrequency = {'a'=> {'b' => 400}, 'b'=> {}, 'c'=> {'d'=> 300, 'a'=> 100}, 'd'=> {}}
+testFrequency = {'a'=> {'b' => 400, 'd' => 4000}, 'b'=> {}, 'c'=> {'d'=> 300, 'a'=> 100}, 'd'=> {}}
 C = ->(i,j) { 
   testFrequency[keys[i]][keys[j]].to_i + testFrequency[keys[j]][keys[i]].to_i 
 }
@@ -214,6 +214,7 @@ p.mip(presolve: Rglpk::GLP_ON)
 z = p.obj.mip
 puts z
 
+puts mipCols.map {|e| e.mip_val.to_i }.inspect
 remaining_keys = keys.dup
 board = []
 for c in 0..numKeyCols-1 do
