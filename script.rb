@@ -109,28 +109,28 @@ p.obj.dir = Rglpk::GLP_MIN
 
 matrix = []
 
-numKeyCols = 2
-keyPerCol = 2
-keys = %w(a b c d)
+numKeyCols = 8
+# keyPerCol = 3
+keys = %w(a b c d e f g h i j k l m n)
 numKeys = keys.count
 
 # P_{ic} is an indicator variable which is true if k_i appears in column i
 # in the final solution
 # P_index computes the index of one of the H indicator variables
-P_index = MIP.P_generator(numKeys,numKeyCols)
-offset = P_index.range[1]+1
+P_index = MIP.P_generator(numKeys, numKeyCols)
+offset = P_index.range[1] + 1
 
 # H_{ijc} is an indicator variable which is true if k_i, and k_j are both
 # in column c in the final solution
 # H_index computes the index of one of the H indicator variables
-H_index = MIP.H_generator(numKeys,numKeyCols,offset)
-offset = H_index.range[1]+1
+H_index = MIP.H_generator(numKeys, numKeyCols, offset)
+offset = H_index.range[1] + 1
 
 # M_{ik} is an indicator variable which is true if k_i, and k_j are in the
 # same column in the final solution
 # M_index computes the index of one of the M indicator variables
-M_index = MIP.M_generator(numKeys,offset)
-offset = M_index.range[1] +1
+M_index = MIP.M_generator(numKeys, offset)
+offset = M_index.range[1] + 1
 
 numVars = P_index.count + H_index.count + M_index.count
 
@@ -143,17 +143,17 @@ end
 # result should be 8 with 4 keys in 2 cols of 2
 objCoefs = [0] * numVars
 
-testFrequency = {'a'=> {'b' => 400, 'd' => 4000}, 'b'=> {}, 'c'=> {'d'=> 300, 'a'=> 100}, 'd'=> {}}
-C = ->(i,j) { 
-  testFrequency[keys[i]][keys[j]].to_i + testFrequency[keys[j]][keys[i]].to_i 
-}
+# testFrequency = {'a'=> {'b' => 400, 'd' => 4000}, 'b'=> {}, 'c'=> {'d'=> 300, 'a'=> 100}, 'd'=> {}, 'e' => {'a' => 9, 'b' => 80}}
+C = ->(i, j) do
+  $collision_frequency[keys[i]][keys[j]].to_i + $collision_frequency[keys[j]][keys[i]].to_i
+end
 
-# Minimize conflict given by Sum_{ij} M_{ij}C_{ij} where 
+# Minimize conflict given by Sum_{ij} M_{ij}C_{ij} where
 # C_{ij} gives the conflict rating of keys k_i and k_j
 for i in 0..numKeys - 1 do
-  for j in (i+1)..numKeys - 1 do
-    objCoefs[M_index.call(i,j)] = C.call(i,j)
-    puts [keys[i], keys[j], C.call(i,j), C.call(j,i)].inspect
+  for j in (i + 1)..numKeys - 1 do
+    objCoefs[M_index.call(i, j)] = C.call(i, j)
+    puts [keys[i], keys[j], C.call(i, j), C.call(j, i)].inspect
   end
 end
 p.obj.coefs = objCoefs
@@ -164,7 +164,7 @@ puts objCoefs.inspect
 for ki in 0..numKeys - 1 do
   row = [0] * numVars
   for ci in 0..numKeyCols - 1 do
-    row[P_index.call(ki,ci)] = 1
+    row[P_index.call(ki, ci)] = 1
   end
   lprows = p.add_rows(1)
   lprows[0].set_bounds(Rglpk::GLP_FX, 1, 1)
@@ -172,23 +172,23 @@ for ki in 0..numKeys - 1 do
 end
 
 # column must be filled
-for ci in 0..numKeyCols - 1 do
-  row = [0] * numVars
-  for ki in 0..numKeys - 1 do
-    row[P_index.call(ki,ci)] = 1
-  end
-  lprows = p.add_rows(1)
-  lprows[0].set_bounds(Rglpk::GLP_FX, keyPerCol, keyPerCol)
-  matrix << row
-end
+# for ci in 0..numKeyCols - 1 do
+# row = [0] * numVars
+# for ki in 0..numKeys - 1 do
+# row[P_index.call(ki,ci)] = 1
+# end
+# lprows = p.add_rows(1)
+# lprows[0].set_bounds(Rglpk::GLP_UP, 0, keyPerCol)
+# matrix << row
+# end
 
 # key pair-column aggregator indacators are set
 for k1 in 0..numKeys - 1 do
   for k2 in (k1 + 1)..numKeys - 1 do
     for col in 0..numKeyCols - 1 do
       t = H_index.call(k1, k2, col)
-      v1 = P_index.call(k1,col)
-      v2 = P_index.call(k2,col)
+      v1 = P_index.call(k1, col)
+      v2 = P_index.call(k2, col)
       MIP.and(p, matrix, t, v1, v2)
     end
   end
@@ -200,31 +200,36 @@ for k1 in 0..numKeys - 1 do
     t = M_index.call(k1, k2)
     vs = []
     for col in 0..numKeyCols - 1 do
-      vs << H_index.call(k1,k2,col)
+      vs << H_index.call(k1, k2, col)
     end
     MIP.or(p, matrix, t, *vs)
   end
 end
 
-#puts matrix.to_a.map(&:inspect)
+# puts matrix.to_a.map(&:inspect)
 p.set_matrix(matrix.flatten)
 
 p.simplex
+z = p.obj.get
+puts z
+puts mipCols.map(&:get_prim).inspect
+puts mipCols.count
+
+exit
 p.mip(presolve: Rglpk::GLP_ON)
 z = p.obj.mip
 puts z
 
-puts mipCols.map {|e| e.mip_val.to_i }.inspect
+puts mipCols.map { |e| e.mip_val.to_i }.inspect
 remaining_keys = keys.dup
 board = []
-for c in 0..numKeyCols-1 do
+for c in 0..numKeyCols - 1 do
   col = []
-  for k in 0..numKeys-1 do
-    if mipCols[P_index.call(k,c)].mip_val == 1
-      key = keys[k]
-      col << key
-      raise "key used twice" unless remaining_keys.delete key
-    end
+  for k in 0..numKeys - 1 do
+    next unless mipCols[P_index.call(k, c)].mip_val == 1
+    key = keys[k]
+    col << key
+    raise 'key used twice' unless remaining_keys.delete key
   end
   board << col
 end
